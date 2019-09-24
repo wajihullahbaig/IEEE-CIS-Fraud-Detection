@@ -12,12 +12,12 @@ from sklearn.metrics import roc_auc_score, classification_report, roc_curve
 import matplotlib.pyplot as plt
 
 submission = pd.read_csv('test_transaction.csv')
-label_file = 'single_model_lgbm_submission_pl_pred_s0_d_ms.csv'
+label_file = 'single_model_lgbm_submission_holdout_pred_s0_d_ms.csv'
 training_files = [
-                  'single_model_lgbm_submission_pl_proba_s0_d_ms.csv',
-                  'single_model_lgbm_submission_pl_proba_s0_m_ms.csv',
-                  'single_model_lgbm_submission_pl_proba_s0_h_ms.csv',
-                  'single_model_lgbm_submission_pl_proba_s0_dow_ms.csv',
+                  'single_model_lgbm_submission_holdout_proba_s0_d_ms.csv',
+                  'single_model_lgbm_submission_holdout_proba_s0_m_ms.csv',
+                  'single_model_lgbm_submission_holdout_proba_s0_h_ms.csv',
+                  'single_model_lgbm_submission_holdout_proba_s0_dow_ms.csv',
 
                   ]
 
