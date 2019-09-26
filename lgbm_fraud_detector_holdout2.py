@@ -202,9 +202,9 @@ test.drop(droppable_cols,inplace=True,axis=1)
 
 
 if use_cyclical_features:
-    feature_group = ['weights','C','V','D','uid','card','M','id_','TransactionAmt','addr','R_', 'ProductCD','dist','P_','hour_','dow_','Device','day_']
+    feature_group = ['C','V','D','uid','card','M','id_','TransactionAmt','addr','R_', 'ProductCD','dist','P_','hour_','dow_','Device','day_']
 else:
-    feature_group = ['weights','C','V','D','uid','card','M','id_','TransactionAmt','addr','R_', 'ProductCD','dist','P_','hour','dow','Device','day']
+    feature_group = ['C','V','D','uid','card','M','id_','TransactionAmt','addr','R_', 'ProductCD','dist','P_','hour','dow','Device','day']
 feature_group.reverse()
 
 all_cols = FS.get_feature_names(feature_group,train.columns)  
