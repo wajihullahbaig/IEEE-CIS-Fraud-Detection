@@ -317,4 +317,3 @@ sub['isFraud'] = preds_proba
 sub.to_csv('outputs/single_model_lgbm_submission_holdout_proba.csv',index=False)
 # DISPLAY HISTOGRAM OF PREDICTIONS
 b = plt.hist(sub['isFraud'], bins=num_vars)
-
