@@ -20,6 +20,14 @@ class FeatureSelection():
     def __init__(self):
         pass
     
+    def get_card_names(train):
+        cards = ['card1','card2','card3','card4','card5','card6']
+        found = []
+        for card in cards:
+            if card in train.columns:
+                found.append(card)
+        return found
+        
     def sort_cat_cols_with_uniqueness(train,cat_cols):
         cat_sorted = pd.DataFrame(columns=['feature','nunique'])
         for col in cat_cols:
@@ -142,6 +150,19 @@ class FeatureSelection():
                 all_cols.extend(cols)
         return all_cols
     
+    def get_feature_names_on_productcd(train,feature_group,productCD):
+        features  = train[train.ProductCD == productCD].columns
+        all_cols = []
+        D_cols = list(range(1,17))
+        D_cols = ['D'+str(col) for col in D_cols]
+        if isinstance(feature_group, list):
+            for g in feature_group:
+                cols = [col for col in features if col.startswith(g)]
+                if any(elem in D_cols  for elem in cols):
+                    cols[:] = [x for x in cols if not x.startswith('Device')]
+                all_cols.extend(cols)
+        return all_cols    
+    
     def get_drop_columns_manynans_onlyones(train,test,all_cols,threshold):
         print("Nulls/Ones drop columns...")
         one_value_cols = [col for col in all_cols if train[col].nunique() <= 1]
@@ -155,7 +176,12 @@ class FeatureSelection():
         if "isFraud" in to_drop:
             to_drop.remove("isFraud")
         print(len(to_drop))
-        print("Columns to drop:\n",to_drop)
+        print('Drop one valued columns from train:\n',one_value_cols)
+        print('Drop one valued columns from test:\n',one_value_cols_test)
+        print('Drop many null valued columns from train:\n',many_null_cols)
+        print('Drop many null valued columns from test:\n',many_null_cols_test)
+        print('Drop big top valued columns from train:\n',big_top_value_cols)
+        print('Drop big top valued columns from test:\n',big_top_value_cols_test)
         return to_drop
    
     def get_redundant_pairs(df):

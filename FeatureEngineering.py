@@ -39,13 +39,13 @@ class FeatureEngineering():
     def __init__(self):
         pass    
         
-    def PCA_reduction(df,cols,feature_group,components = 7):
+    def PCA_reduction(df,cols,components):
         # use only one feature group
         print('PCA reduction...')
-        pca_reducer = PCA(n_components=components,random_state=99)
+        pca_reducer = PCA(n_components=components,random_state=components)
         reduced = pca_reducer.fit_transform(df[cols])
         count_cols = list(range(0,components))
-        reduced_cols = [feature_group[0]+'_'+str(col) for col in count_cols]
+        reduced_cols = [str(col)+'_' for col in count_cols]
         pca_df = pd.DataFrame(data = reduced , columns = reduced_cols)
         print('Done!')
         return pca_df  
@@ -57,7 +57,7 @@ class FeatureEngineering():
             scaler.fit(X)
         X = scaler.transform(X)
         return X, scaler
-        
+    
     def expand_id31_and_DeviceInfo(train,test):
         # We splits the categorical data 
         print('Expanding categorical columns...')
@@ -79,7 +79,72 @@ class FeatureEngineering():
         test['DeviceInfo_version'] = expansion[1].copy()
         test['DeviceInfo_Build'] = expansion[2].copy()
         
+        del expansion    
+    def expand_id31_and_DeviceInfo3(train,test):
+        # We splits the categorical data 
+        print('Expanding categorical columns...')
+        train['id_31'].str.lower()
+        train['id_31'] = train['id_31'].str.strip()
+        train['DeviceInfo'].str.lower()
+        train['DeviceInfo'] = train['DeviceInfo'].str.strip()
+        expansion = train['id_31'].str.split(' ',expand=True)
+        count = 0
+        for col in expansion.columns:
+            train['id_31_expansion_'+str(count)] = expansion[col].copy()
+            count += 1    
+        
+        expansion = train['DeviceInfo'].str.split(' ',expand=True)
+        count = 0
+        for col in expansion.columns:
+            train['DeviceInfo_expansion_'+str(count)] = expansion[col].copy()
+            count += 1    
+        
+        test['id_31'].str.lower()
+        test['id_31'] = test['id_31'].str.strip()
+        test['DeviceInfo'].str.lower()
+        test['DeviceInfo'] = test['DeviceInfo'].str.strip()
+        expansion = test['id_31'].str.split(' ',expand=True)
+        count = 0
+        for col in expansion.columns:
+            test['id_31_expansion_'+str(count)] = expansion[col].copy()
+            count += 1    
+        
+        expansion = test['DeviceInfo'].str.split(' ',expand=True)
+        count = 0
+        for col in expansion.columns:
+            test['DeviceInfo_expansion_'+str(count)] = expansion[col].copy()
+            count += 1  
+        train.drop(['id_31','DeviceInfo'],inplace=True,axis=1)
+        test.drop(['id_31','DeviceInfo'],inplace=True,axis=1)
+
+    def expand_id31_and_DeviceInfo2(train,test):
+        # We splits the categorical data 
+        print('Expanding categorical columns...')
+        expansion = train['id_31'].str.split(' ',expand=True)
+        if expansion.shape[1] >2:
+            train['id_31_browser_name'] = expansion[0].copy()
+            train['id_31_browser_name_or_version'] = expansion[1].copy()
+            train['id_31_browser_version'] = expansion[2].copy()
+            expansion = train['DeviceInfo'].str.split(' ',expand=True)
+        if expansion.shape[1] >2:
+            train['DeviceInfo_name'] = expansion[0].copy()
+            train['DeviceInfo_version'] = expansion[1].copy()
+            train['DeviceInfo_Build'] = expansion[2].copy()
+        
+        expansion = test['id_31'].str.split(' ',expand=True)
+        if expansion.shape[1] >2:
+            test['id_31_browser_name'] = expansion[0].copy()
+            test['id_31_browser_name_or_version'] = expansion[1].copy()
+            test['id_31_browser_version'] = expansion[2].copy()
+        if expansion.shape[1] >2:
+            expansion = test['DeviceInfo'].str.split(' ',expand=True)
+            test['DeviceInfo_name'] = expansion[0].copy()
+            test['DeviceInfo_version'] = expansion[1].copy()
+            test['DeviceInfo_Build'] = expansion[2].copy()
+        print('Done!')    
         del expansion
+
+
 
     def normalize_central_mean_std(train,test,cols):
         print('Normalize central mean...')
@@ -106,10 +171,12 @@ class FeatureEngineering():
         
     def create_nan_indicator(train,test,cols):
         print('Creating nan indicator features...')
+        return_cols = []
         for c in tqdm(cols):
+            return_cols.append(c+"_nan_indicator")
             train[c+"_nan_indicator"] = np.where(train[c].isna(),0,1)
             test[c+"_nan_indicator"] = np.where(test[c].isna(),0,1)
-        
+        return return_cols
         
     def encode_cyclical_features(train,test,cols_maxvals):
         print('Encoding cyclical features...')
@@ -390,24 +457,26 @@ class FeatureEngineering():
         print("Aggregating...")
         for col in tqdm(features):
             temp_dict = train.groupby([col])[target].agg([operation]).reset_index().rename(
-                                                                columns={operation: col+'_target_'+operation})
+                                                                columns={operation: col+'_'+target+'_'+operation})
             temp_dict.index = temp_dict[col].values
-            temp_dict = temp_dict[col+'_target_'+operation].to_dict()
-            train[col+'_target_'+operation] = train[col].map(temp_dict)
+            temp_dict = temp_dict[col+'_'+target+'_'+operation].to_dict()
+            train[col+'_'+target+'_'+operation] = train[col].map(temp_dict)
             
         for col in tqdm(features):
             temp_dict = test.groupby([col])[target].agg([operation]).reset_index().rename(
-                                                                columns={operation: col+'_target_'+operation})
+                                                                columns={operation: col+'_'+target+'_'+operation})
             temp_dict.index = temp_dict[col].values
-            temp_dict = temp_dict[col+'_target_'+operation].to_dict()         
-            test[col+'_target_'+operation]  = test[col].map(temp_dict)            
+            temp_dict = temp_dict[col+'_'+target+'_'+operation].to_dict()         
+            test[col+'_'+target+'_'+operation]  = test[col].map(temp_dict)            
     
     def create_null_sum(train,test,features):
         print('Creating null sum features...')
+        return_cols = []
         for f in tqdm(features):
+            return_cols.append(f+"_null_sum")
             train[f+"_null_sum"] = train[f].isna().sum() 
             test[f+"_null_sum"] = test[f].isna().sum() 
-    
+        return return_cols
     def replace_nan_mode(df,binary_features):
         print("Replacing NaN with mode on binary features...")
         for feature in tqdm(binary_features):

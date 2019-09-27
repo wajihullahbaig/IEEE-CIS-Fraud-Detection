@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Aug 22 13:54:05 2019
+Created on Wed Jul 31 16:25:25 2019
 
-@author: wajih
+@author: TNDUser
 """
 
 import pandas as pd
@@ -26,7 +25,7 @@ warnings.filterwarnings("ignore")
 
 print("Reading csv's...")    
 
-local_test= False
+local_test = False
 use_sampling = 0
 use_cyclical_features = True
 use_V_log_features = True
@@ -39,7 +38,7 @@ granularity_to_use["dow"] = DS.per_week_down_sampling
 granularity_to_use["day"] = DS.per_day_down_sampling
 granularity_to_use["hour"] = DS.per_hour_down_sampling
 
-granularity_key = "hour"
+granularity_key = "day"
 
 
 if not local_test:
@@ -70,13 +69,8 @@ print("Feature engineering...")
 train = FE.reduce_mem_usage(train)
 test = FE.reduce_mem_usage(test)
 
-#droppable_cols = FS.get_drop_columns_manynans_onlyones(train,test,test.columns,threshold = 0.90)
-#train.drop(droppable_cols,inplace=True,axis=1)
-#test.drop(droppable_cols,inplace=True,axis=1)
-
 FE.make_ymdhd_feature(train)
 FE.make_ymdhd_feature(test)
-
     
 if use_sampling == 0:
     train,_ = granularity_to_use[granularity_key](train)   
@@ -107,60 +101,61 @@ elif use_sampling == 4:
     del extension;positive_class
     train.drop_duplicates(keep='first', inplace=True)
     train = train.reset_index(drop=True)
-    train,_ = granularity_to_use[granularity_key](train)
-
+    train,_ = granularity_to_use[granularity_key](train)   
     
 print('Training size:',len(train))
 print("isFraud = 0:",len(train[train.isFraud==0]))
 print("isFraud = 1:",len(train[train.isFraud==1]))
 
 if use_cyclical_features:
-    cyclical_features = {'month':12,'day':31,'hour':23,'dow':6}
-    FE.encode_cyclical_features(train,test,cyclical_features)
-
+    cyclical_features = {'day':31,'hour':23,'dow':6}
+    cyclical_features = FE.encode_cyclical_features(train,test,cyclical_features)    
+    
 FE.expand_id31_and_DeviceInfo(train,test)    
 cat_cols = FS.get_categorical_columns(train)     
 sorted_cat_cols = FS.sort_cat_cols_with_uniqueness(train,cat_cols)
-agg_cols = sorted_cat_cols[sorted_cat_cols["nunique"] >= 1]["feature"].values.tolist()
+agg_cols = sorted_cat_cols[sorted_cat_cols["nunique"] >= 40]["feature"].values.tolist()
 FE.aggregation_on_train_map_on_test(train,test,agg_cols,'var','isFraud')   
 FE.noise_reset(train,test,['card1'],10)  
 FE.encode_frequency(train,test,cat_cols)
-FE.encode_label(train,test,cat_cols) 
+FE.encode_label(train,test,cat_cols)   
 
 FE.split_decimal_and_fractional_part(train,test,["TransactionAmt"]) 
 train["ProductCD_fractioned"] = train["ProductCD"].astype(str) + train["TransactionAmt_fractional"].astype(str) 
 test["ProductCD_fractioned"] = test["ProductCD"].astype(str) + test["TransactionAmt_fractional"].astype(str)
-FE.aggregation_on_train_map_on_test(train,test,['ProductCD_fractioned'],'var','isFraud')   
+FE.aggregation_on_train_map_on_test(train,test,['ProductCD_fractioned'],'var','isFraud')  
 FE.encode_frequency(train,test,['ProductCD_fractioned'])
-FE.encode_label(train,test,['ProductCD_fractioned']) 
+FE.encode_label(train,test,['ProductCD_fractioned'])  
 
-FE.make_transactionamt_features(train,test,'TransactionAmt','uid1')  
+FE.make_transactionamt_features(train,test,'TransactionAmt','uid1') 
 FE.encode_frequency(train,test,['uid1'])
-FE.encode_label(train,test,['uid1'])
- 
+FE.encode_label(train,test,['uid1']) 
 FE.make_transactionamt_features(train,test,'TransactionAmt_fractional','uid2')  
 FE.encode_frequency(train,test,['uid2'])
-FE.encode_label(train,test,['uid2']) 
-
+FE.encode_label(train,test,['uid2'])
+    
 if use_cyclical_features:
     feature_group = [granularity_key+'_']
 else:
     feature_group = [granularity_key]
-all_cols = FS.get_feature_names(feature_group,train.columns)   
-FE.split_decimal_and_fractional_part(train,test,all_cols)
-col_list = []
-for col in tqdm(all_cols):
-    col_list.append(col+'_fractional')
-    
-t_cols = []
-for col in tqdm(col_list):
+time_features = FS.get_feature_names(feature_group,train.columns)   
+t_cols =  []
+for col in tqdm(time_features):
+    t_cols.append(col+'_'+"ProductCD")
+    train[col+'_'+"ProductCD"] = train[col].astype(str) + train["ProductCD"].astype(str) 
+    test[col+'_'+"ProductCD"] = test[col].astype(str) + test["ProductCD"].astype(str)
+FE.aggregation_on_train_map_on_test(train,test,t_cols,'var','isFraud')
+FE.encode_frequency(train,test,t_cols)      
+FE.encode_label(train,test,t_cols)    
+
+t_cols =  []
+for col in tqdm(time_features):
     t_cols.append(col+'_'+"TransactionAmt_fractional")
     train[col+'_'+"TransactionAmt_fractional"] = train[col].astype(str) + train["TransactionAmt_fractional"].astype(str) 
     test[col+'_'+"TransactionAmt_fractional"] = test[col].astype(str) + test["TransactionAmt_fractional"].astype(str)
-        
-FE.aggregation_on_train_map_on_test(train,test,t_cols,'var','isFraud')       
-t_cols_fq_enc = FE.encode_frequency(train,test,t_cols)
-FE.encode_label(train,test,t_cols)    
+FE.aggregation_on_train_map_on_test(train,test,t_cols,'var','isFraud')
+FE.encode_frequency(train,test,t_cols)      
+FE.encode_label(train,test,t_cols)  
 
 feature_group = ['uid','addr','dist','card','ProductCD','C','M','V','id_','D','P_','R_','Device']
 all_cols = FS.get_feature_names(feature_group,train.columns)   
@@ -175,31 +170,46 @@ if use_V_log_features:
     V_cols = FS.get_high_difference_V_columns(train)
     FE.create_log_feature(train,V_cols,1000)     
     FE.create_log_feature(test,V_cols,1000)
-    FE.split_decimal_and_fractional_part(train,test,V_cols)
     col_list = []
     for col in tqdm(V_cols):
-        col_list.append(col+'_fractional')      
+        col_list.append(col+'_ProductCD')
+        train[col+'_ProductCD'] = train[col].astype(str) + train["ProductCD"].astype(str) 
+        test[col+'_ProductCD'] = test[col].astype(str) + test["ProductCD"].astype(str)
+#    FE.aggregation_on_train_map_on_test(train,test,col_list,'var','isFraud')  
     FE.encode_frequency(train,test,col_list)
+    FE.encode_label(train,test,col_list)  
+    
+feature_group = ['C','D']
+all_cols = FS.get_feature_names(feature_group,train.columns)      
+col_list = []
+for col in tqdm(all_cols):
+    col_list.append(col+'_ProductCD')
+    train[col+'_ProductCD'] = train[col].astype(str) + train["ProductCD"].astype(str) 
+    test[col+'_ProductCD'] = test[col].astype(str) + test["ProductCD"].astype(str)
+#FE.aggregation_on_train_map_on_test(train,test,col_list,'var','isFraud')  
+FE.encode_frequency(train,test,col_list)
+FE.encode_label(train,test,col_list)        
 #  
 #    df = train[train.DeviceInfo<=1000] 
 #    plt.scatter(df[df.isFraud==0].TransactionDT,df[df.isFraud==0]['TransactionAmt_fractional'])
 #    plt.scatter(df[df.isFraud==1].TransactionDT,df[df.isFraud==1]['TransactionAmt_fractional'])
 
- 
-feature_group = ['D']
-all_cols = FS.get_feature_names(feature_group,train.columns) 
-droppable_cols = SFS.eliminate_features_on_ks2(train,test,all_cols)
+#feature_group = ['uid','addr','dist','card','ProductCD','C','M','V','id_','D','P_','R_','Device']
+#all_cols = FS.get_feature_names(feature_group,train.columns)  
+droppable_cols = SFS.eliminate_features_on_ks2(train,test,col_list)
 train.drop(droppable_cols,inplace=True,axis=1)
 test.drop(droppable_cols,inplace=True,axis=1)
+
+
 if use_cyclical_features:
-    feature_group = ['C','V','D','uid','card','M','id_','TransactionAmt','addr','R_', 'ProductCD','dist','P_','hour_','dow_','Device','day_','month_']
+    feature_group = ['C','V','D','uid','card','M','id_','TransactionAmt','addr','R_', 'ProductCD','dist','P_','hour_','dow_','Device','day_']
 else:
-    feature_group = ['C','V','D','uid','card','M','id_','TransactionAmt','addr','R_', 'ProductCD','dist','P_','hour','dow','Device','day','month']
+    feature_group = ['C','V','D','uid','card','M','id_','TransactionAmt','addr','R_', 'ProductCD','dist','P_','hour','dow','Device','day']
 feature_group.reverse()
 
 all_cols = FS.get_feature_names(feature_group,train.columns)  
-all_cols.remove('TransactionAmt_fractional')
-
+if 'TransactionAmt_fractional' in all_cols:
+    all_cols.remove('TransactionAmt_fractional')
 
 print("Feature engineering all done!")   
 
@@ -278,8 +288,7 @@ print('##################')
 print('Training : Single Model Hold Out Pred AUC=',v_pred)
 print('##################')
 print('Training : Single Model Hold out ProabA AUC=',v_proba)
-avg_pred_auc += v_pred/splits
-avg_proba_auc += v_proba/splits
+
 ct = pd.crosstab(valid_y,ho_pred,rownames=['Actual'],colnames=['Predicted'],margins=True)
 print(ct)
 print(classification_report(valid_y,ho_pred))
@@ -415,8 +424,7 @@ print('##################')
 print('Training : Single Model Hold Out Pred AUC=',v_pred)
 print('##################')
 print('Training : Single Model Hold out ProabA AUC=',v_proba)
-avg_pred_auc += v_pred/splits
-avg_proba_auc += v_proba/splits
+
 ct = pd.crosstab(valid_y,ho_pred,rownames=['Actual'],colnames=['Predicted'],margins=True)
 print(ct)
 print(classification_report(valid_y,ho_pred))
@@ -431,8 +439,8 @@ fpr, tpr, thresh = roc_curve(valid_y, ho_proba)
 plt.plot(fpr,tpr,label="auc="+str(v_proba))
 plt.legend(loc=4)
 
-preds_proba += clf.predict_proba(test[all_cols], num_iteration=clf.best_iteration_)[:, 1]
-preds += clf.predict(test[all_cols], num_iteration=clf.best_iteration_)
+preds_proba = clf.predict_proba(test[all_cols], num_iteration=clf.best_iteration_)[:, 1]
+preds = clf.predict(test[all_cols], num_iteration=clf.best_iteration_)
 
 
 
