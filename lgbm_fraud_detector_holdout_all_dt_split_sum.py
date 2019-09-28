@@ -248,7 +248,10 @@ for key in granularity_to_use.keys():
     train_x, train_y = train[all_cols].loc[train_idx], train['isFraud'].loc[train_idx]
     valid_x, valid_y = train[all_cols].loc[valid_idx], train['isFraud'].loc[valid_idx]
              
-        
+    print("Starting gradient boosting...")
+    w = FE.get_positive_class_weight(train) 
+    print("Positive class weight:",w)
+    
     clf = LGBMClassifier(
              nthread=-1,
         objective= "binary",
