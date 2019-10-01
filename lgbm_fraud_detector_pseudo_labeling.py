@@ -356,15 +356,19 @@ print("Positive class weight:",w)
 
 if not use_monthly_splits:
     s = sorted(train[granularity_key].unique())
-    limit = np.ceil(len(s)*.7)
+    limit = np.ceil(len(s)*0.7)
     train_size = s[int(limit)]   
     print("train size limit:",train_size)
-    train_idx = train[train[granularity_key] <= train_size].index.values
-    valid_idx = train[train[granularity_key] > train_size].index.values
+    train = train.sort_values(granularity_key)
+    train.reset_index(drop=True,inplace=True) 
+    train_idx = train[train[granularity_key] <= train_size].sort_values(granularity_key).index.values
+    valid_idx = train[train[granularity_key] > train_size].sort_values(granularity_key).index.values
 else:   
     print("train size in months:",6)
-    train_idx = train[train.month <= 6].index.values
-    valid_idx = train[train.month > 6].index.values
+    train = train.sort_values('month')
+    train.reset_index(drop=True,inplace=True) 
+    train_idx = train[train.month <= 6].sort_values('month').index.values
+    valid_idx = train[train.month > 6].sort_values('month').index.values
 
 print("Traing obsevations length:",len(train_idx))    
 print("Validation obsevations length:",len(valid_idx))    
