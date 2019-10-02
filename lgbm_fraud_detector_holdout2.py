@@ -71,7 +71,7 @@ test = FE.reduce_mem_usage(test)
 
 FE.make_ymdhd_feature(train)
 FE.make_ymdhd_feature(test)
-    
+  
 if use_sampling == 0:
     train,_ = granularity_to_use[granularity_key](train)   
 elif use_sampling == 1:
@@ -111,14 +111,14 @@ if use_cyclical_features:
     cyclical_features = {'day':31,'hour':23,'dow':6}
     cyclical_features = FE.encode_cyclical_features(train,test,cyclical_features)    
     
-FE.expand_id31_and_DeviceInfo(train,test)    
+FE.expand_id31_and_DeviceInfo3(train,test)    
 cat_cols = FS.get_categorical_columns(train)     
 sorted_cat_cols = FS.sort_cat_cols_with_uniqueness(train,cat_cols)
-agg_cols = sorted_cat_cols[sorted_cat_cols["nunique"] >= 40]["feature"].values.tolist()
-FE.aggregation_on_train_map_on_test(train,test,agg_cols,'var','isFraud')   
+agg_cols = sorted_cat_cols[sorted_cat_cols["nunique"] >= 50]["feature"].values.tolist()
+#FE.aggregation_on_train_map_on_test(train,test,agg_cols,'var','isFraud')   
 FE.noise_reset(train,test,['card1'],10)  
 FE.encode_frequency(train,test,cat_cols)
-FE.encode_label(train,test,cat_cols)   
+FE.encode_label(train,test,cat_cols)
 
 FE.split_decimal_and_fractional_part(train,test,["TransactionAmt"]) 
 train["ProductCD_fractioned"] = train["ProductCD"].astype(str) + train["TransactionAmt_fractional"].astype(str) 
@@ -128,12 +128,14 @@ FE.encode_frequency(train,test,['ProductCD_fractioned'])
 FE.encode_label(train,test,['ProductCD_fractioned'])  
 
 FE.make_transactionamt_features(train,test,'TransactionAmt','uid1') 
+FE.aggregation_on_train_map_on_test(train,test,['uid1'],'var','isFraud')  
 FE.encode_frequency(train,test,['uid1'])
 FE.encode_label(train,test,['uid1']) 
 FE.make_transactionamt_features(train,test,'TransactionAmt_fractional','uid2')  
+FE.aggregation_on_train_map_on_test(train,test,['uid2'],'var','isFraud')  
 FE.encode_frequency(train,test,['uid2'])
 FE.encode_label(train,test,['uid2'])
-    
+  
 if use_cyclical_features:
     feature_group = [granularity_key+'_']
 else:
@@ -157,6 +159,25 @@ FE.aggregation_on_train_map_on_test(train,test,t_cols,'var','isFraud')
 FE.encode_frequency(train,test,t_cols)      
 FE.encode_label(train,test,t_cols)  
 
+t_cols =  []
+for col in tqdm(agg_cols):
+    t_cols.append(col+'_'+"ProductCD")
+    train[col+'_'+"ProductCD"] = train[col].astype(str) + train["ProductCD"].astype(str) 
+    test[col+'_'+"ProductCD"] = test[col].astype(str) + test["ProductCD"].astype(str)
+FE.aggregation_on_train_map_on_test(train,test,t_cols,'var','isFraud')
+FE.encode_frequency(train,test,t_cols)      
+FE.encode_label(train,test,t_cols)  
+    
+t_cols =  []
+for col in tqdm(agg_cols):
+    t_cols.append(col+'_'+"TransactionAmt_fractional")
+    train[col+'_'+"TransactionAmt_fractional"] = train[col].astype(str) + train["TransactionAmt_fractional"].astype(str) 
+    test[col+'_'+"TransactionAmt_fractional"] = test[col].astype(str) + test["TransactionAmt_fractional"].astype(str)
+FE.aggregation_on_train_map_on_test(train,test,t_cols,'var','isFraud')
+FE.encode_frequency(train,test,t_cols)      
+FE.encode_label(train,test,t_cols)  
+
+
 feature_group = ['uid','addr','dist','card','ProductCD','C','M','V','id_','D','P_','R_','Device']
 all_cols = FS.get_feature_names(feature_group,train.columns)   
 train.replace([np.inf, -np.inf], np.nan,inplace=True)
@@ -164,6 +185,7 @@ test.replace([np.inf, -np.inf], np.nan,inplace=True)
 droppable_cols = FS.get_drop_columns_manynans_onlyones(train,test,all_cols,threshold = 0.90)
 train.drop(droppable_cols,inplace=True,axis=1)
 test.drop(droppable_cols,inplace=True,axis=1)
+
 train.fillna(-999, inplace=True)
 test.fillna(-999, inplace=True)    
 if use_V_log_features:
@@ -189,16 +211,11 @@ for col in tqdm(all_cols):
 #FE.aggregation_on_train_map_on_test(train,test,col_list,'var','isFraud')  
 FE.encode_frequency(train,test,col_list)
 FE.encode_label(train,test,col_list)        
-#  
-#    df = train[train.DeviceInfo<=1000] 
-#    plt.scatter(df[df.isFraud==0].TransactionDT,df[df.isFraud==0]['TransactionAmt_fractional'])
-#    plt.scatter(df[df.isFraud==1].TransactionDT,df[df.isFraud==1]['TransactionAmt_fractional'])
 
-#feature_group = ['uid','addr','dist','card','ProductCD','C','M','V','id_','D','P_','R_','Device']
-#all_cols = FS.get_feature_names(feature_group,train.columns)  
 droppable_cols = SFS.eliminate_features_on_ks2(train,test,col_list)
 train.drop(droppable_cols,inplace=True,axis=1)
 test.drop(droppable_cols,inplace=True,axis=1)
+
 
 
 if use_cyclical_features:
@@ -225,9 +242,7 @@ if visualize_corr_clusters:
     
 train[all_cols]= train[all_cols].apply(pd.to_numeric) 
 test[all_cols] = test[all_cols].apply(pd.to_numeric)
-train = train.sort_values(granularity_key)
-train.reset_index(drop=True,inplace=True) 
-    
+
 print("Starting gradient boosting...")
 w = FE.get_positive_class_weight(train) 
 print("Positive class weight:",w)
@@ -242,12 +257,12 @@ if not use_monthly_splits:
     train_idx = train[train[granularity_key] <= train_size].sort_values(granularity_key).index.values
     valid_idx = train[train[granularity_key] > train_size].sort_values(granularity_key).index.values
 else:   
-    print("train size in months:",6)
+    print("train size in months:",5)
     train = train.sort_values('month')
     train.reset_index(drop=True,inplace=True) 
-    train_idx = train[train.month <= 6].sort_values('month').index.values
-    valid_idx = train[train.month > 6].sort_values('month').index.values
-    
+    train_idx = train[train.month <= 5].sort_values('month').index.values
+    valid_idx = train[train.month > 5].sort_values('month').index.values
+
 print("Traing obsevations length:",len(train_idx))    
 print("Validation obsevations length:",len(valid_idx))    
 
