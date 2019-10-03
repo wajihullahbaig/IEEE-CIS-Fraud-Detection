@@ -14,6 +14,16 @@ class DataSampling():
     def __init__(self):
         pass
     
+    def per_product_cd_down_sampling(train):
+        t = pd.DataFrame()
+        productCDs = train.ProductCD.unique().tolist()
+        for productCD in tqdm(productCDs):
+            v = train[train.ProductCD == productCD]
+            down_sampled_df = DataSampling.one_go_down_sampling(v)
+            t = pd.concat([t, down_sampled_df])
+        
+        return t
+            
     def reverse_column_values(train,cols):
         print('Reversing columns...')
         train_augumented = train.copy()
@@ -84,7 +94,7 @@ class DataSampling():
         down_sampled_df = df.copy()
         down_sampled_df.drop(down_sampled_df.index, inplace=True)
         fraud_ratio = []
-        for h in range(df.hour.min(),df.hour.max()+1):
+        for h in range(int(df.hour.min()),int(df.hour.max()+1)):
             fc = len(df[(df.isFraud==1) &(df.hour==h)])
             nfc = len(df[(df.isFraud==0) &(df.hour==h)])
             print("hour ",h,"fraud counts:",fc)
