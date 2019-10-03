@@ -251,7 +251,7 @@ if not use_monthly_splits:
     s = sorted(train[granularity_key].unique())
     if granularity_key == 'month':
         limit = np.ceil(len(s)*0.5)
-    elif granularity_key == 'dow' or granularity_key == 'month':
+    elif granularity_key == 'dow':
         limit = np.ceil(len(s)*0.7)
     else:
         limit = np.ceil(len(s)*0.8)
