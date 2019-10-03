@@ -17,6 +17,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler,MaxAbsScaler
 from sklearn.decomposition import PCA
+from sklearn.model_selection import StratifiedKFold
+from numpy.random import normal
 import gc
 
 # References
@@ -35,10 +37,70 @@ import gc
 # http://ianlondon.github.io/blog/encoding-cylcical-features-24-hour-time/
 # https://kaggle.com/zikazika/could-we-predict-fraud-solely-based-on-nan
 # https://www.kaggle.com/c/ieee-fraud-detection/discussion/108575#latest-625440
+# https://www.kaggle.com/vprokopev/mean-likelihood-encodings-a-comprehensive-study
 class FeatureEngineering():
     def __init__(self):
         pass    
-        
+    
+
+    def mean_encoder(train_data, test_data, columns, target_col, reg_method=None,
+                    alpha=0, add_random=False, rmean=0, rstd=0.1, folds=1):
+        '''Returns a DataFrame with encoded columns'''
+        print('Performing mean encoding...')
+        encoded_cols = []
+        target_mean_global = train_data[target_col].mean()
+        for col in tqdm(columns):
+            # Getting means for test data
+            nrows_cat = train_data.groupby(col)[target_col].count()
+            target_means_cats = train_data.groupby(col)[target_col].mean()
+            target_means_cats_adj = (target_means_cats*nrows_cat + 
+                                     target_mean_global*alpha)/(nrows_cat+alpha)
+            # Mapping means to test data
+            encoded_col_test = test_data[col].map(target_means_cats_adj)
+            # Getting a train encodings
+            if reg_method == 'expanding_mean':
+                train_data_shuffled = train_data.sample(frac=1, random_state=1)
+                cumsum = train_data_shuffled.groupby(col)[target_col].cumsum() - train_data_shuffled[target_col]
+                cumcnt = train_data_shuffled.groupby(col).cumcount()
+                encoded_col_train = cumsum/(cumcnt)
+                encoded_col_train.fillna(target_mean_global, inplace=True)
+                if add_random:
+                    encoded_col_train = encoded_col_train + normal(loc=rmean, scale=rstd, 
+                                                                   size=(encoded_col_train.shape[0]))
+            elif (reg_method == 'k_fold') and (folds > 1):
+                kfold = StratifiedKFold(train_data[target_col].values, folds, shuffle=True, random_state=1)
+                parts = []
+                for tr_in, val_ind in kfold:
+                    # divide data
+                    df_for_estimation, df_estimated = train_data.iloc[tr_in], train_data.iloc[val_ind]
+                    # getting means on data for estimation (all folds except estimated)
+                    nrows_cat = df_for_estimation.groupby(col)[target_col].count()
+                    target_means_cats = df_for_estimation.groupby(col)[target_col].mean()
+                    target_means_cats_adj = (target_means_cats*nrows_cat + 
+                                             target_mean_global*alpha)/(nrows_cat+alpha)
+                    # Mapping means to estimated fold
+                    encoded_col_train_part = df_estimated[col].map(target_means_cats_adj)
+                    if add_random:
+                        encoded_col_train_part = encoded_col_train_part + normal(loc=rmean, scale=rstd, 
+                                                                                 size=(encoded_col_train_part.shape[0]))
+                    # Saving estimated encodings for a fold
+                    parts.append(encoded_col_train_part)
+                encoded_col_train = pd.concat(parts, axis=0)
+                encoded_col_train.fillna(target_mean_global, inplace=True)
+            else:
+                encoded_col_train = train_data[col].map(target_means_cats_adj)
+                if add_random:
+                    encoded_col_train = encoded_col_train + normal(loc=rmean, scale=rstd, 
+                                                                   size=(encoded_col_train.shape[0]))
+    
+            # Saving the column with means
+            encoded_col = pd.concat([encoded_col_train, encoded_col_test], axis=0)
+            encoded_col[encoded_col.isnull()] = target_mean_global
+            encoded_cols.append(pd.DataFrame({'mean_'+target_col+'_'+col:encoded_col}))
+        all_encoded = pd.concat(encoded_cols, axis=1)
+        return all_encoded[:len(train_data)], all_encoded[len(train_data):]
+
+    
     def PCA_reduction(df,cols,components):
         # use only one feature group
         print('PCA reduction...')
@@ -57,7 +119,7 @@ class FeatureEngineering():
             scaler.fit(X)
         X = scaler.transform(X)
         return X, scaler
-    
+        
     def expand_id31_and_DeviceInfo(train,test):
         # We splits the categorical data 
         print('Expanding categorical columns...')
@@ -226,9 +288,14 @@ class FeatureEngineering():
             test[c+"_sum"] = test[test[c] == val][c].astype(np.int32).sum()/len(test)
         print('Done!')    
     def get_positive_class_weight (train):
-        P = len(train[train.isFraud == 1])
-        T = len(train)
-        return T/P - 1.0
+        if isinstance(train,pd.DataFrame):
+            P = len(train[train.isFraud == 1])
+            T = len(train)
+        else:
+            _, counts = np.unique(train, return_counts=True)
+            T = counts[0]
+            P = counts[1]
+        return (T/P)-1.0
     def add_noise(series, noise_level):
         return series * (1 + noise_level * np.random.randn(len(series)))
 

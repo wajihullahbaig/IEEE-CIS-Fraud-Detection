@@ -29,7 +29,7 @@ local_test = False
 use_sampling = 0
 use_cyclical_features = True
 use_V_log_features = True
-use_monthly_splits = True
+use_monthly_splits = False
 visualize_corr_clusters = False 
 
 granularity_to_use  ={}
@@ -38,7 +38,7 @@ granularity_to_use["dow"] = DS.per_week_down_sampling
 granularity_to_use["day"] = DS.per_day_down_sampling
 granularity_to_use["hour"] = DS.per_hour_down_sampling
 
-granularity_key = "day"
+granularity_key = "month"
 
 
 if not local_test:
@@ -249,13 +249,18 @@ print("Positive class weight:",w)
 
 if not use_monthly_splits:
     s = sorted(train[granularity_key].unique())
-    limit = np.ceil(len(s)*0.7)
+    if granularity_key == 'month':
+        limit = np.ceil(len(s)*0.5)
+    elif granularity_key == 'dow' or granularity_key == 'month':
+        limit = np.ceil(len(s)*0.7)
+    else:
+        limit = np.ceil(len(s)*0.8)
     train_size = s[int(limit)]   
     print("train size limit:",train_size)
-    train = train.sort_values(granularity_key)
+    train = train.sort_values(by = ['month',granularity_key])
     train.reset_index(drop=True,inplace=True) 
-    train_idx = train[train[granularity_key] <= train_size].sort_values(granularity_key).index.values
-    valid_idx = train[train[granularity_key] > train_size].sort_values(granularity_key).index.values
+    train_idx = train[train[granularity_key] <= train_size].sort_values(by = ['month',granularity_key]).index.values
+    valid_idx = train[train[granularity_key] > train_size].sort_values(by = ['month',granularity_key]).index.values
 else:   
     print("train size in months:",5)
     train = train.sort_values('month')
@@ -263,6 +268,8 @@ else:
     train_idx = train[train.month <= 5].sort_values('month').index.values
     valid_idx = train[train.month > 5].sort_values('month').index.values
 
+print('Granularity key for down sampling:',granularity_key)
+print('Use monthly splits:',use_monthly_splits)
 print("Traing obsevations length:",len(train_idx))    
 print("Validation obsevations length:",len(valid_idx))    
 
@@ -336,3 +343,4 @@ sub['isFraud'] = preds_proba
 sub.to_csv('outputs/single_model_lgbm_submission_holdout_proba.csv',index=False)
 # DISPLAY HISTOGRAM OF PREDICTIONS
 b = plt.hist(sub['isFraud'], bins=num_vars)
+

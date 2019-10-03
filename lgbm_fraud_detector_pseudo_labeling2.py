@@ -29,7 +29,7 @@ local_test = False
 use_sampling = 0
 use_cyclical_features = True
 use_V_log_features = True
-use_monthly_splits = True
+use_monthly_splits = False
 visualize_corr_clusters = False 
 
 granularity_to_use  ={}
@@ -249,13 +249,18 @@ print("Positive class weight:",w)
 
 if not use_monthly_splits:
     s = sorted(train[granularity_key].unique())
-    limit = np.ceil(len(s)*0.7)
+    if granularity_key == 'month':
+        limit = np.ceil(len(s)*0.5)
+    elif granularity_key == 'dow':
+        limit = np.ceil(len(s)*0.7)
+    else:
+        limit = np.ceil(len(s)*0.8)
     train_size = s[int(limit)]   
     print("train size limit:",train_size)
-    train = train.sort_values(granularity_key)
+    train = train.sort_values(by = ['month',granularity_key])
     train.reset_index(drop=True,inplace=True) 
-    train_idx = train[train[granularity_key] <= train_size].sort_values(granularity_key).index.values
-    valid_idx = train[train[granularity_key] > train_size].sort_values(granularity_key).index.values
+    train_idx = train[train[granularity_key] <= train_size].sort_values(by = ['month',granularity_key]).index.values
+    valid_idx = train[train[granularity_key] > train_size].sort_values(by = ['month',granularity_key]).index.values
 else:   
     print("train size in months:",5)
     train = train.sort_values('month')
@@ -263,8 +268,11 @@ else:
     train_idx = train[train.month <= 5].sort_values('month').index.values
     valid_idx = train[train.month > 5].sort_values('month').index.values
 
+print('Granularity key for down sampling:',granularity_key)
+print('Use monthly splits:',use_monthly_splits)
 print("Traing obsevations length:",len(train_idx))    
 print("Validation obsevations length:",len(valid_idx))    
+  
 
 train_x, train_y = train[all_cols].loc[train_idx], train['isFraud'].loc[train_idx]
 valid_x, valid_y = train[all_cols].loc[valid_idx], train['isFraud'].loc[valid_idx]
@@ -379,16 +387,20 @@ train.reset_index(drop=True,inplace=True)
 w = FE.get_positive_class_weight(train) 
 print("Positive class weight:",w)
 
-
 if not use_monthly_splits:
     s = sorted(train[granularity_key].unique())
-    limit = np.ceil(len(s)*0.7)
+    if granularity_key == 'month':
+        limit = np.ceil(len(s)*0.5)
+    elif granularity_key == 'dow':
+        limit = np.ceil(len(s)*0.7)
+    else:
+        limit = np.ceil(len(s)*0.8)
     train_size = s[int(limit)]   
     print("train size limit:",train_size)
-    train = train.sort_values(granularity_key)
+    train = train.sort_values(by = ['month',granularity_key])
     train.reset_index(drop=True,inplace=True) 
-    train_idx = train[train[granularity_key] <= train_size].sort_values(granularity_key).index.values
-    valid_idx = train[train[granularity_key] > train_size].sort_values(granularity_key).index.values
+    train_idx = train[train[granularity_key] <= train_size].sort_values(by = ['month',granularity_key]).index.values
+    valid_idx = train[train[granularity_key] > train_size].sort_values(by = ['month',granularity_key]).index.values
 else:   
     print("train size in months:",5)
     train = train.sort_values('month')
@@ -396,8 +408,10 @@ else:
     train_idx = train[train.month <= 5].sort_values('month').index.values
     valid_idx = train[train.month > 5].sort_values('month').index.values
 
+print('Granularity key for down sampling:',granularity_key)
+print('Use monthly splits:',use_monthly_splits)
 print("Traing obsevations length:",len(train_idx))    
-print("Validation obsevations length:",len(valid_idx))    
+print("Validation obsevations length:",len(valid_idx))     
 
 train_x, train_y = train[all_cols].loc[train_idx], train['isFraud'].loc[train_idx]
 valid_x, valid_y = train[all_cols].loc[valid_idx], train['isFraud'].loc[valid_idx]
